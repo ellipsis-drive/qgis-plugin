@@ -33,9 +33,10 @@ SIZEW = 0
 SIZEH = 500
 
 URL = V3URL
+APPURL = 'https://app.ellipsis-drive.com'
 
 MAXPATHLEN = 45
-
+print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
 DEBUG = False
 DISABLESEARCH = False
 
@@ -169,6 +170,13 @@ def getAPIUrl():
     return theurl
 
 
+def getAPPUrl():
+    """returns the api url"""
+    settings = QSettings("Ellipsis Drive", "Ellipsis Drive Connect")
+    theappurl = settings.value("appUrl", APPURL)
+    return theappurl
+
+
 def GET(url, headers, data):
     """make GET request"""
     coded_data = ""
@@ -282,6 +290,13 @@ def isValidAPIUrl(url):
         return True
     except:
         return False
+
+
+def isValidAppUrl(url):
+    if "ellipsis" not in url.lower():
+        return False
+
+    return True
 
 
 def isValidTimestamp(t):

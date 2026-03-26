@@ -3,12 +3,13 @@ from PyQt5.QtCore import QSize
 
 from PyQt5.QtWidgets import QDockWidget, QStackedWidget, QWidget
 from qgis.PyQt import uic
-
+from qgis.core import QgsMessageLog, Qgis
 from qgis.PyQt.QtCore import QSettings, pyqtSignal
 from .MyDriveLoggedIn import MyDriveLoggedInTab
 from .MyDriveLogIn import MyDriveLoginTab
 from .NoConnection import NoConnectionTab
 from .OAuthTab import OAuthTab
+from .pollingScreen import pollingScreenTab
 from .Settings import SettingsTab
 from .util import *
 
@@ -17,7 +18,7 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(TABSFOLDER, "MyDriveStack.ui"))
 
 class MyDriveTab(QDockWidget, FORM_CLASS):
     """the class that encapsulates the other views that are actually shown"""
-
+    print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
     loginSignal = pyqtSignal(object)
     logoutSignal = pyqtSignal()
     closingPlugin = pyqtSignal()
@@ -35,7 +36,7 @@ class MyDriveTab(QDockWidget, FORM_CLASS):
         self.loginWidget = MyDriveLoginTab()
         self.loggedInWidget = MyDriveLoggedInTab()
         self.noconnectionWidget = NoConnectionTab()
-        self.oauthWidget = OAuthTab()
+        self.pollingScreenWidget = pollingScreenTab()
         self.settingsWidget = SettingsTab()
 
         self.stackedWidget = QStackedWidget()
@@ -53,16 +54,20 @@ class MyDriveTab(QDockWidget, FORM_CLASS):
         self.loginWidget.loginSignal.connect(self.handleLoginSignal)
         self.loggedInWidget.logoutSignal.connect(self.handleLogoutSignal)
         self.noconnectionWidget.connectedSignal.connect(self.handleConnectedSignal)
-        self.oauthWidget.returnsignal.connect(self.handleReturnSignal)
-        self.loginWidget.oauthNeeded.connect(self.handleOauthNeededSignal)
+
         self.loginWidget.settingsSignal.connect(self.handleSettingsSignal)
+
+        self.loginWidget.pollingSignal.connect(self.handlePollingSignal)
+
+
         self.settingsWidget.returnsignal.connect(self.handleReturnSignal)
+        self.pollingScreenWidget.returnsignal.connect(self.handleReturnSignal)
 
         self.stackedWidget.addWidget(self.loginWidget)
         self.stackedWidget.addWidget(self.loggedInWidget)
         self.stackedWidget.addWidget(self.noconnectionWidget)
-        self.stackedWidget.addWidget(self.oauthWidget)
         self.stackedWidget.addWidget(self.settingsWidget)
+        self.stackedWidget.addWidget(self.pollingScreenWidget)
 
         self.settings = QSettings("Ellipsis Drive", "Ellipsis Drive Connect")
 
@@ -70,11 +75,18 @@ class MyDriveTab(QDockWidget, FORM_CLASS):
 
     def handleSettingsSignal(self):
         """settings signal handler"""
+        self.stackedWidget.setCurrentIndex(3)
+
+    def handlePollingSignal(self):
+        """settings signal handler"""
+        QgsMessageLog.logMessage(
+            "go to polling3",
+            "MyPlugin",
+            Qgis.Info
+        )
         self.stackedWidget.setCurrentIndex(4)
 
-    def handleOauthNeededSignal(self):
-        """oauth needed signal handler"""
-        self.stackedWidget.setCurrentIndex(3)
+
 
     def handleReturnSignal(self):
         """oauth return signal handler"""

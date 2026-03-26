@@ -13,26 +13,29 @@ from PyQt5.QtWidgets import (
 from qgis.PyQt.QtCore import QSettings, pyqtSignal
 from qgis.PyQt.QtWidgets import QMessageBox
 from requests.structures import CaseInsensitiveDict
+from qgis.core import QgsMessageLog, Qgis
+import webbrowser
+
+from .polling import POLLING_MANAGER
+
 
 from .util import *
-
+from . import util
 
 class MyDriveLoginTab(QDialog):
     """login tab, sends a signal with the token on succesful login. Used in combination with the MyDriveLoggedInTab"""
 
     loginSignal = pyqtSignal(object, object)
-    oauthNeeded = pyqtSignal()
     settingsSignal = pyqtSignal()
+    pollingSignal = pyqtSignal()
 
     def __init__(self):
         super(MyDriveLoginTab, self).__init__()
+        self.manager = POLLING_MANAGER
         # uic.loadUi(os.path.join(TABSFOLDER, "MyDriveLoginTab.ui"), self)
         self.settings = QSettings("Ellipsis Drive", "Ellipsis Drive Connect")
-
         self.constructUI()
 
-        self.username = ""
-        self.password = ""
         self.userInfo = {}
         self.rememberMe = self.checkBox_remember.isChecked()
         self.loggedIn = False
@@ -55,18 +58,12 @@ class MyDriveLoginTab(QDialog):
         """function that constructs the login UI"""
         self.gridLayout = QGridLayout()
 
-        self.label_username = QLabel()
-        self.label_username.setText("Username")
 
-        self.label_password = QLabel()
-        self.label_password.setText("Password")
 
         self.checkBox_remember = QCheckBox()
         self.checkBox_remember.setChecked(True)
         self.checkBox_remember.setText("Remember me")
 
-        self.lineEdit_password = QLineEdit()
-        self.lineEdit_username = QLineEdit()
         self.pushButton_login = QPushButton()
         self.pushButton_login.setText("Login")
         self.spacer = QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -76,17 +73,10 @@ class MyDriveLoginTab(QDialog):
         self.pushButton_settings.clicked.connect(self.goToSettings)
 
         self.pushButton_login.clicked.connect(self.loginButton)
-        self.lineEdit_username.textChanged.connect(self.onUsernameChange)
-        self.lineEdit_password.textChanged.connect(self.onPasswordChange)
-        self.lineEdit_password.setEchoMode(QLineEdit.Password)
         self.checkBox_remember.stateChanged.connect(
             lambda: self.onChangeRemember(self.checkBox_remember)
         )
 
-        self.gridLayout.addWidget(self.label_username, 0, 0)
-        self.gridLayout.addWidget(self.lineEdit_username, 1, 0, 1, 2)
-        self.gridLayout.addWidget(self.label_password, 2, 0)
-        self.gridLayout.addWidget(self.lineEdit_password, 3, 0, 1, 2)
         self.gridLayout.addWidget(self.checkBox_remember, 4, 0)
 
         self.gridLayout.addWidget(self.pushButton_settings, 5, 1)
@@ -98,6 +88,13 @@ class MyDriveLoginTab(QDialog):
 
     def goToSettings(self):
         self.settingsSignal.emit()
+
+
+
+
+
+
+
 
     def onChangeRemember(self, button):
         """function called when the 'remember me' checkbox is clicked"""
@@ -139,64 +136,71 @@ class MyDriveLoginTab(QDialog):
         retval = msg.exec_()
         return
 
-    def handleOAuthError(self):
-        # emit signal
-        self.oauthNeeded.emit()
+
 
     def loginButton(self):
-        """handler for the log in button"""
-        actual_remember = False
-        # check if the user is sure that they want us to remember their login token
-        if self.rememberMe:
-            confirm_remember = self.confirmRemember()
-            if not confirm_remember:
-                return
-            else:
-                actual_remember = True
-
-        log(f"Logging in: username: {self.username}, password: {self.password}")
-
+        QgsMessageLog.logMessage(
+            "go to polling",
+            "MyPlugin",
+            Qgis.Info
+        )
+        CaseInsensitiveDict()
         headers = CaseInsensitiveDict()
         headers["Content-Type"] = "application/json"
-        data = {
-            "username": self.username,
-            "password": self.password,
-            "validFor": 5184000,
-        }  # max validFor value is 5184000
-
-        log(data)
-
         reqsuc, content = makeRequest(
-            "/account/login", headers=headers, data=data, method="POST"
+            "/account/security/remoteSession", headers=headers, data={}, method="POST"
         )
 
         if reqsuc:
-            self.loggedIn = True
-            loginToken = content["token"]
-            log("logged in")
-            if actual_remember:
-                self.settings.setValue("token", content["token"])
-                log("login token saved to settings")
-            else:
-                log("token NOT saved to settings")
-            success, data = getUserData(loginToken)
-            if success:
-                self.loginSignal.emit(loginToken, data)
-            self.username = ""
-            self.password = ""
-            self.lineEdit_username.setText("")
-            self.lineEdit_password.setText("")
+            QgsMessageLog.logMessage(
+                str(content),
+                "MyPlugin",
+                Qgis.Info
+            )
+
+            uuid = content['id']
+            util.SESSION = uuid
+
+            webbrowser.open( util.getAPPUrl() + "/login?session=" + uuid)
+            self.pollingSignal.emit()
+
+
+            # define function to run when condition is met
+            def onSuccess(token):
+                self.manager.stopPolling()
+                QgsMessageLog.logMessage(
+                    "success! " + token ,
+                    "MyPlugin",
+                    Qgis.Info
+                )
+                if  self.rememberMe:
+                    self.settings.setValue("token", token)
+                    log("login token saved to settings")
+                else:
+                    log("token NOT saved to settings")
+                success, data = getUserData(token)
+                if success:
+                    self.loginSignal.emit(token, data)
+
+
+            self.manager.startPolling(uuid,onSuccess)
+
+
+
         else:
             log("Login failed")
+            QgsMessageLog.logMessage(
+                str(content),
+                "MyPlugin",
+                Qgis.Info
+            )
             log(content)
-            if content is None:
-                self.displayNoneError()
-            elif (
-                "message" in content and content["message"] == "No password configured."
-            ):
-                self.handleOAuthError()
-            else:
-                self.displayLoginError()
+            self.displayNoneError()
+
+
+
+
+
 
     def onUsernameChange(self, text):
         """makes the internal username match the form"""

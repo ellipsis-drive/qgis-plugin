@@ -25,7 +25,8 @@ class SettingsTab(QDialog):
 
         self.settings = QSettings("Ellipsis Drive", "Ellipsis Drive Connect")
         self.apiUrl = self.settings.value("apiUrl", URL)
-
+        self.appUrl = self.settings.value("appUrl", APPURL)
+        print('app url', self.appUrl)
         self.setMinimumHeight(0)
         self.setMinimumWidth(0)
 
@@ -39,26 +40,38 @@ class SettingsTab(QDialog):
 
     def back(self):
         # check if the api url is valid
-        if isValidAPIUrl(self.apiUrl):
+        if isValidAPIUrl(self.apiUrl) and isValidAppUrl(self.appUrl):
             # save the api url
+            self.settings.setValue("appUrl", self.appUrl)
             self.settings.setValue("apiUrl", self.apiUrl)
             self.returnsignal.emit()
         else:
             # show an error message
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Critical)
-            msg.setText("The API URL does not seem to be valid. Please try again.")
+            msg.setText("The API and/or app URL do not seem to be valid. Please try again.")
             msg.setWindowTitle("Error")
             msg.exec_()
+
 
     def resetApiUrl(self):
         self.apiUrlEdit.setText(URL)
         self.onApiUrlChange(URL)
+        self.appUrlEdit.setText(APPURL)
+        self.onAppUrlChange(APPURL)
+
+
 
     def onApiUrlChange(self, text):
         # save the api url
         self.apiUrl = text
         self.settings.setValue("apiUrl", text)
+
+    def onAppUrlChange(self, text):
+        # save the api url
+        self.appUrl = text
+        self.settings.setValue("appUrl", text)
+
 
     def constructUI(self):
         self.gridLayout = QGridLayout()
@@ -69,18 +82,32 @@ class SettingsTab(QDialog):
         self.apiUrlEdit.setText(self.apiUrl)
         self.apiUrlEdit.textChanged.connect(self.onApiUrlChange)
 
+
+        self.label_appurl = QLabel()
+        self.label_appurl.setText("APP url")
+
+        self.appUrlEdit = QLineEdit()
+        self.appUrlEdit.setText(self.appUrl)
+        self.appUrlEdit.textChanged.connect(self.onAppUrlChange)
+
+
+
+
         self.resetButton = QPushButton()
         self.resetButton.setText("Reset")
         self.resetButton.clicked.connect(self.resetApiUrl)
 
         self.backButton = QPushButton()
-        self.backButton.setText("Back")
+        self.backButton.setText("Submit")
         self.backButton.clicked.connect(self.back)
 
         self.gridLayout.addWidget(self.label, 0, 0)
         self.gridLayout.addWidget(self.apiUrlEdit, 1, 0)
-        self.gridLayout.addWidget(self.resetButton, 2, 0)
-        self.gridLayout.addWidget(self.backButton, 3, 0)
+        self.gridLayout.addWidget(self.label_appurl, 2, 0)
+        self.gridLayout.addWidget(self.appUrlEdit, 3, 0)
+
+        self.gridLayout.addWidget(self.resetButton, 4, 0)
+        self.gridLayout.addWidget(self.backButton, 5, 0)
 
         self.spacer = QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.gridLayout.addItem(self.spacer, 4, 0, 1, 2)
